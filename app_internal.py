@@ -130,7 +130,7 @@ def generate_pdf_report(records, auditor, audit_date, special_notes, evaluations
     )
     
     # ヘッダー情報
-    story.append(Paragraph("Imaging CRO 内部監査チェックシート", title_style))
+    story.append(Paragraph("外部信頼性保証チェック＆レビューシート（内部監査相当）", title_style))
     story.append(Spacer(1, 20))
     
     # 会社情報
@@ -144,8 +144,8 @@ def generate_pdf_report(records, auditor, audit_date, special_notes, evaluations
     
     # 監査情報
     audit_info = f"""
-    <b>監査者：</b>{auditor}<br/>
-    <b>監査日：</b>{audit_date}
+    <b>レビュー実施者（外部QA)：</b>{auditor}<br/>
+    <b>実施日：</b>{audit_date}
     """
     story.append(Paragraph(audit_info, normal_style))
     story.append(Spacer(1, 30))
