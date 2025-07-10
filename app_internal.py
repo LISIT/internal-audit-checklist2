@@ -62,8 +62,12 @@ data = {
     ]
 }
 
-st.set_page_config(page_title="内部監査チェックシート", layout="wide")
-st.title("Imaging CRO 内部監査チェックシート")
+st.set_page_config(page_title="外部信頼性保証チェック＆レビューシート（内部監査相当）", layout="wide")
+st.title("外部信頼性保証チェック＆レビューシート（内部監査相当）")
+st.markdown("""
+※ 本レビューは、SOP001 Annex-001-Aに基づき、当社が実施する外部QAレビューを記録するものであり、内部監査に準ずる品質保証活動として位置づけられます。  
+※ レビュー実施者は、信頼性保証に関する知識・経験を有する適格な外部QA担当者によって実施されています。
+""")
 
 st.markdown("""
 株式会社リジット  
@@ -71,8 +75,8 @@ st.markdown("""
 山本修司
 """)
 
-auditor = st.text_input("監査者名")
-audit_date = st.date_input("監査日", value=date.today())
+auditor = st.text_input("レビュー実施者（外部QA)")
+audit_date = st.date_input("実施日", value=date.today())
 
 records = []
 
