@@ -1,6 +1,32 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import io
+import base64
+
+# 日本語フォントの設定
+try:
+    # reportlab-japanese-fontsがインストールされている場合
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+    pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
+    JAPANESE_FONT = 'HeiseiMin-W3'
+except ImportError:
+    # フォールバック: システムフォントを使用
+    try:
+        # Windows の日本語フォント
+        pdfmetrics.registerFont(TTFont('YuGothic', 'C:/Windows/Fonts/yu Gothic.ttc'))
+        JAPANESE_FONT = 'YuGothic'
+    except:
+        # デフォルトフォント
+        JAPANESE_FONT = 'Helvetica'
 
 # チェックシートのデータ（カテゴリと項目）
 data = {
@@ -64,6 +90,113 @@ for section, items in data.items():
             "コメント": comment
         })
 
+def generate_pdf_report(records, auditor, audit_date, special_notes, evaluations):
+    """PDFレポートを生成する関数"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # 日本語フォントを使用したスタイル設定
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        spaceAfter=30,
+        alignment=TA_CENTER,
+        textColor=colors.darkblue,
+        fontName=JAPANESE_FONT
+    )
+    
+    # 日本語フォントを使用した通常スタイル
+    normal_style = ParagraphStyle(
+        'JapaneseNormal',
+        parent=styles['Normal'],
+        fontName=JAPANESE_FONT,
+        fontSize=10
+    )
+    
+    # 日本語フォントを使用した見出しスタイル
+    heading_style = ParagraphStyle(
+        'JapaneseHeading',
+        parent=styles['Heading2'],
+        fontName=JAPANESE_FONT,
+        fontSize=14,
+        spaceAfter=10
+    )
+    
+    # ヘッダー情報
+    story.append(Paragraph("Imaging CRO 内部監査チェックシート", title_style))
+    story.append(Spacer(1, 20))
+    
+    # 会社情報
+    company_info = f"""
+    <b>株式会社リジット</b><br/>
+    コード開発者：代表および信頼性保証責任者<br/>
+    山本修司
+    """
+    story.append(Paragraph(company_info, normal_style))
+    story.append(Spacer(1, 20))
+    
+    # 監査情報
+    audit_info = f"""
+    <b>監査者：</b>{auditor}<br/>
+    <b>監査日：</b>{audit_date}
+    """
+    story.append(Paragraph(audit_info, normal_style))
+    story.append(Spacer(1, 30))
+    
+    # 各カテゴリの結果
+    current_category = ""
+    for record in records:
+        if record['カテゴリ'] != current_category:
+            current_category = record['カテゴリ']
+            story.append(Paragraph(f"<b>{current_category}</b>", heading_style))
+            story.append(Spacer(1, 10))
+        
+        # 項目と結果
+        item_text = f"""
+        <b>項目：</b>{record['項目']}<br/>
+        <b>対応状況：</b>{record['対応状況']}<br/>
+        <b>コメント：</b>{record['コメント']}
+        """
+        story.append(Paragraph(item_text, normal_style))
+        story.append(Spacer(1, 10))
+    
+    # 特記事項
+    story.append(Paragraph("<b>7. 特記事項</b>", heading_style))
+    story.append(Paragraph(special_notes, normal_style))
+    story.append(Spacer(1, 20))
+    
+    # 評価結果
+    story.append(Paragraph("<b>監査結果の評価（顧問記入）</b>", heading_style))
+    eval_data = [
+        ['評価項目', '評価'],
+        ['総合的な体制整備', evaluations['総合的な体制整備']],
+        ['SOP運用の実効性', evaluations['SOP運用の実効性']],
+        ['データ管理とセキュリティ', evaluations['データ管理とセキュリティ']],
+        ['継続的改善の姿勢', evaluations['継続的改善の姿勢']]
+    ]
+    
+    eval_table = Table(eval_data, colWidths=[3*inch, 1*inch])
+    eval_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), JAPANESE_FONT),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('FONTNAME', (0, 1), (-1, -1), JAPANESE_FONT),
+        ('FONTSIZE', (0, 1), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(eval_table)
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
 # 7. 特記事項
 st.header("7. 特記事項")
 st.text_area("内部監査で確認された特記事項", height=100, key="special_notes")
@@ -83,7 +216,40 @@ if st.button("保存する"):
     df["SOP運用の実効性"] = eval_2
     df["データ管理とセキュリティ"] = eval_3
     df["継続的改善の姿勢"] = eval_4
-    filename = f"audit_{audit_date}_{auditor.replace(' ', '_')}.csv"
-    df.to_csv(filename, index=False)
-    st.success(f"保存しました: {filename}")
-    st.download_button("CSVをダウンロード", data=df.to_csv(index=False), file_name=filename, mime="text/csv")
+    
+    # ファイル名のベース部分
+    base_filename = f"audit_{audit_date}_{auditor.replace(' ', '_')}"
+    
+    # CSVファイルの保存
+    csv_filename = f"{base_filename}.csv"
+    df.to_csv(csv_filename, index=False)
+    
+    # PDFファイルの生成
+    evaluations = {
+        "総合的な体制整備": eval_1,
+        "SOP運用の実効性": eval_2,
+        "データ管理とセキュリティ": eval_3,
+        "継続的改善の姿勢": eval_4
+    }
+    
+    pdf_buffer = generate_pdf_report(records, auditor, audit_date, st.session_state["special_notes"], evaluations)
+    pdf_filename = f"{base_filename}.pdf"
+    
+    st.success(f"保存しました: {csv_filename}, {pdf_filename}")
+    
+    # ダウンロードボタン
+    col1, col2 = st.columns(2)
+    with col1:
+        st.download_button(
+            "CSVをダウンロード", 
+            data=df.to_csv(index=False), 
+            file_name=csv_filename, 
+            mime="text/csv"
+        )
+    with col2:
+        st.download_button(
+            "PDFをダウンロード", 
+            data=pdf_buffer.getvalue(), 
+            file_name=pdf_filename, 
+            mime="application/pdf"
+        )
